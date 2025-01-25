@@ -1,0 +1,124 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Stock Market Analysis Tool</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            text-align: center;
+            margin: 20px;
+        }
+        .form-container {
+            margin: 20px auto;
+            width: 300px;
+        }
+        input[type="text"], input[type="number"], select {
+            width: 100%;
+            padding: 10px;
+            margin: 10px 0;
+            border: 1px solid #ccc;
+            border-radius: 4px;
+        }
+        button {
+            padding: 10px 20px;
+            background-color: #007BFF;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+        }
+        button:hover {
+            background-color: #0056b3;
+        }
+        .error {
+            color: red;
+            margin: 10px 0;
+        }
+        table {
+            margin: 20px auto;
+            border-collapse: collapse;
+            width: 50%;
+            text-align: center;
+        }
+        th, td {
+            padding: 10px;
+            border: 1px solid #ccc;
+        }
+        th {
+            background-color: #f4f4f4;
+            font-weight: bold;
+        }
+        img {
+            margin: 20px 0;
+            max-width: 90%;
+            height: auto;
+        }
+    </style>
+</head>
+<body>
+    <h1>Predictive Stock Market Analysis Tool</h1>
+    <div class="form-container">
+        <form method="POST" action="/predict">
+            <input type="text" name="stock_symbol" placeholder="Enter Stock Symbol (e.g., AAPL)" required>
+            <input type="number" name="days_to_predict" placeholder="Enter Days to Predict" min="1" required>
+            <select name="display_format">
+                <option value="chart">Chart</option>
+                <option value="table">Table</option>
+            </select>
+            <button type="submit">Predict</button>
+        </form>
+    </div>
+    {% if error %}
+    <p class="error">{{ error }}</p>
+    {% endif %}
+
+    {% if display_format == 'chart' and plot_url %}
+    <h3>Prediction Chart for {{ stock_symbol }}:</h3>
+    <img src="{{ plot_url }}" alt="Stock Prediction Chart">
+    {% endif %}
+
+{% if display_format == 'table' %}
+    <h3>{{ stock_symbol }} - Prediction Table</h3>
+
+    <!-- Historical Data Table -->
+    <h4>Historical Data:</h4>
+    <table border="1">
+        <thead>
+            <tr>
+                <th>Date</th>
+                <th>Historical Price</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for date, price in zip(historical_dates, historical_prices) %}
+            <tr>
+                <td>{{ date }}</td>
+                <td>{{ price }}</td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+
+    <!-- Predicted Data Table -->
+    <h4>Predicted Data:</h4>
+    <table border="1">
+        <thead>
+            <tr>
+                <th>Date</th>
+                <th>Predicted Price</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for date, price in zip(prediction_dates, predicted_prices) %}
+            <tr>
+                <td>{{ date }}</td>
+                <td>{{ price[0] }}</td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+{% endif %}
+</body>
+</html>
