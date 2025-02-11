@@ -26,35 +26,37 @@ def home():
 @app.route('/predict', methods=['POST'])
 def predict_stock():
     try:
-        # Get inputs from the form
         stock_symbol = request.form.get('stock_symbol')
         days_to_predict = int(request.form.get('days_to_predict', 1))
-        display_format = request.form.get('display_format', 'chart')  # Get format (chart/table)
-        look_back = 60
+        display_format = request.form.get('display_format', 'chart')
+        look_back = 60  # Number of previous days to use for prediction
 
         # Fetch historical stock data
         stock_data = yf.download(stock_symbol, period='2y')
         if stock_data.empty:
             return render_template('index.html', error='Invalid stock symbol or no data available')
 
-        close_prices = stock_data['Close'].values.reshape(-1, 1)
+        # Use Open, High, Low, Close prices
+        selected_features = ['Open', 'High', 'Low', 'Close']
+        stock_prices = stock_data[selected_features].values
+
         scaler = MinMaxScaler(feature_range=(0, 1))
-        scaled_data = scaler.fit_transform(close_prices)
+        scaled_data = scaler.fit_transform(stock_prices)
 
         X_data, y_data = prepare_data(scaled_data, look_back)
-        X_data = X_data.reshape((X_data.shape[0], X_data.shape[1], 1))
+        X_data = X_data.reshape((X_data.shape[0], look_back, 4))  # 4 features (OHLC)
 
         # Build and train the LSTM model
         model = Sequential([
-            LSTM(50, return_sequences=True, input_shape=(look_back, 1)),
+            LSTM(50, return_sequences=True, input_shape=(look_back, 4)),
             LSTM(50, return_sequences=False),
             Dense(25),
-            Dense(1)
+            Dense(4)  # Predict Open, High, Low, Close
         ])
         model.compile(optimizer='adam', loss='mean_squared_error')
         model.fit(X_data, y_data, batch_size=32, epochs=10, verbose=1)
 
-        # Predict future prices
+        # Predict future OHLC prices
         recent_data = scaled_data[-look_back:]
         predicted_prices = []
         prediction_dates = []
@@ -66,44 +68,27 @@ def predict_stock():
             if last_date.weekday() in [5, 6]:  # Skip weekends
                 continue
 
-            input_data = recent_data.reshape((1, look_back, 1))
-            prediction = model.predict(input_data)
-            predicted_prices.append(prediction[0, 0])
+            input_data = recent_data.reshape((1, look_back, 4))
+            prediction = model.predict(input_data)[0]
+            predicted_prices.append(prediction)
             prediction_dates.append(last_date)
-            recent_data = np.append(recent_data[1:], prediction)
+            recent_data = np.vstack([recent_data[1:], prediction])
             predictions_made += 1
 
-        predicted_prices = scaler.inverse_transform(np.array(predicted_prices).reshape(-1, 1)).tolist()
+        predicted_prices = scaler.inverse_transform(predicted_prices)
 
-        # Extract historical data
-        historical_prices = scaler.inverse_transform(scaled_data[-look_back:]).flatten().tolist()
-        historical_dates = stock_data.index[-look_back:].strftime('%Y-%m-%d').tolist()
-
-        # If format is chart, generate the plot
+        # Plot only future predicted Close prices
         plot_url = None
         if display_format == 'chart':
-            plt.figure(figsize=(14, 10))
-            fig, (ax1, ax2) = plt.subplots(2, 1, figsize=(12, 10))
+            plt.figure(figsize=(12, 6))
+            plt.plot(prediction_dates, predicted_prices[:, 3], label='Predicted Close Prices', color='orange', marker='o', linestyle='--')
+            plt.title(f'{stock_symbol} - Future Predicted Close Prices')
+            plt.xlabel('Date')
+            plt.ylabel('Price')
+            plt.xticks(rotation=45)
+            plt.legend()
+            plt.grid(True, linestyle='--', alpha=0.6)
 
-            historical_prices_plot = scaler.inverse_transform(scaled_data[-look_back:]).flatten()
-            historical_dates_plot = stock_data.index[-look_back:]
-            ax1.plot(historical_dates_plot, historical_prices_plot, label='Last 60 Days Prices', color='blue')
-            ax1.set_title(f'{stock_symbol} - Last 60 Days Prices')
-            ax1.set_xlabel('Date')
-            ax1.set_ylabel('Price')
-            ax1.tick_params(axis='x', rotation=45)
-            ax1.grid(True, linestyle='--', alpha=0.6)
-            ax1.legend()
-
-            ax2.plot(prediction_dates, predicted_prices, label='Predicted Prices', color='orange', marker='o', linestyle='--')
-            ax2.set_title(f'{stock_symbol} - Predicted Prices ({days_to_predict} Days)')
-            ax2.set_xlabel('Date')
-            ax2.set_ylabel('Price')
-            ax2.tick_params(axis='x', rotation=45)
-            ax2.grid(True, linestyle='--', alpha=0.6)
-            ax2.legend()
-
-            plt.tight_layout()
             buf = io.BytesIO()
             plt.savefig(buf, format='png')
             buf.seek(0)
@@ -112,10 +97,8 @@ def predict_stock():
 
         return render_template(
             'index.html',
-            plot_url=f'data:image/png;base64,{plot_url}' if display_format in ['chart', 'both'] else None,
-            historical_prices=historical_prices,  # Historical data
-            historical_dates=historical_dates,
-            predicted_prices=predicted_prices,  # Predicted data
+            plot_url=f'data:image/png;base64,{plot_url}' if display_format == 'chart' else None,
+            predicted_prices=predicted_prices.tolist(),
             prediction_dates=[date.strftime('%Y-%m-%d') for date in prediction_dates],
             stock_symbol=stock_symbol,
             zip=zip,
@@ -126,4 +109,4 @@ def predict_stock():
         return render_template('index.html', error=str(e))
 
 if __name__ == '__main__':
-    app.run(debug=True,port=8080)
+    app.run(debug=True, port=8080)
