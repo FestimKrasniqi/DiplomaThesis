@@ -31,6 +31,7 @@ def predict_stock():
         display_format = request.form.get('display_format', 'chart')
         look_back = 60  # Number of previous days to use for prediction
 
+
         # Fetch historical stock data
         stock_data = yf.download(stock_symbol, period='2y')
         if stock_data.empty:
