@@ -37,7 +37,6 @@ pip install -r requirements.txt
 python app.py
 
 👤 Author
-Festim Krasniqi
-GitHub: @FestimKrasniqi
+[Festim Krasniqi] (https://github.com/FestimKrasniq)
 
 
