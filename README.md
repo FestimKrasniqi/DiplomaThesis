@@ -38,6 +38,6 @@ python app.py
 
 👤 Author
 
-- [Festim Krasniqi] (https://github.com/FestimKrasniq)
+- [Festim Krasniqi](https://github.com/FestimKrasniq)
 
 
